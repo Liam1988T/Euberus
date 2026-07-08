@@ -1,32 +1,45 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ref, onValue } from 'firebase/database';
-import { database } from '@/lib/firebase';
 import { useParams, useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase'; // Updated path to your Supabase client
 
 export default function MovieDetail() {
   const { id } = useParams();
   const router = useRouter();
   const [movie, setMovie] = useState<any>(null);
-  const [allMovies, setAllMovies] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    const moviesRef = ref(database, 'movies');
-    onValue(moviesRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const list = Object.keys(data).map(key => ({ id: key, ...data[key] }));
-        setAllMovies(list);
-        if (id) setMovie(list.find(m => m.id === id));
-      }
-    });
-  }, [id]);
+    if (!id) return;
 
-  // Filter: Same genre, not the current movie, max 4 items
-  const recommendations = allMovies
-    .filter(m => m.id !== id && m.genre === movie?.genre)
-    .slice(0, 4);
+    const fetchMovieData = async () => {
+      // 1. Fetch current movie
+      const { data: movieData, error: movieError } = await supabase
+        .from('movies')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (movieError) {
+        console.error("Error fetching movie:", movieError);
+        return;
+      }
+      setMovie(movieData);
+
+      // 2. Fetch recommendations (Same genre, not the current one)
+      const { data: recData } = await supabase
+        .from('movies')
+        .select('*')
+        .eq('genre', movieData.genre)
+        .neq('id', id)
+        .limit(4);
+
+      setRecommendations(recData || []);
+    };
+
+    fetchMovieData();
+  }, [id]);
 
   const getEmbedLink = (link: string) => {
     if (!link) return "";
@@ -38,16 +51,14 @@ export default function MovieDetail() {
   return (
     <main className="min-h-screen bg-black text-white p-8 md:p-20">
       <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12">
-        {/* Poster */}
         <img src={movie.imageUrl} className="w-full aspect-[2/3] object-cover rounded-2xl shadow-2xl border border-gray-800" alt={movie.title} />
         
-        {/* Info */}
         <div className="space-y-6">
           <h1 className="text-5xl font-black tracking-tighter">{movie.title}</h1>
           <div className="flex gap-4 text-red-500 font-bold">
             <span>{movie.genre}</span>
-            <span>{movie.country}</span>
-            <span>{movie.rating ? `★ ${movie.rating}/10` : ''}</span>
+            {movie.country && <span>{movie.country}</span>}
+            {movie.rating && <span>★ {movie.rating}/10</span>}
           </div>
           
           <div className="space-y-4">
@@ -55,7 +66,6 @@ export default function MovieDetail() {
             <p className="text-gray-300 leading-relaxed">{movie.description || "No description available."}</p>
           </div>
 
-          {/* Additional Metadata */}
           <div className="pt-4 space-y-2 border-t border-gray-800">
             {movie.starring && <p className="text-sm"><span className="text-white font-bold">Starring:</span> <span className="text-gray-400">{movie.starring}</span></p>}
             {movie.script && <p className="text-sm"><span className="text-white font-bold">Script:</span> <span className="text-gray-400">{movie.script}</span></p>}
@@ -70,17 +80,12 @@ export default function MovieDetail() {
         </div>
       </div>
 
-      {/* Recommended Section */}
       {recommendations.length > 0 && (
         <section className="max-w-5xl mx-auto mt-20">
           <h3 className="text-2xl font-bold mb-8 border-l-4 border-red-600 pl-4">More Like This</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {recommendations.map((rec) => (
-              <div 
-                key={rec.id} 
-                onClick={() => router.push(`/movie/${rec.id}`)}
-                className="cursor-pointer group"
-              >
+              <div key={rec.id} onClick={() => router.push(`/movie/${rec.id}`)} className="cursor-pointer group">
                 <div className="aspect-[2/3] overflow-hidden rounded-lg bg-gray-900 mb-2 border border-gray-800">
                   <img src={rec.imageUrl} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                 </div>
@@ -91,16 +96,10 @@ export default function MovieDetail() {
         </section>
       )}
 
-      {/* Modal Overlay */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-4xl aspect-video relative">
-            <button 
-              onClick={() => setIsModalOpen(false)} 
-              className="absolute -top-12 right-0 text-white font-bold hover:text-red-500 text-xl"
-            >
-              CLOSE [X]
-            </button>
+            <button onClick={() => setIsModalOpen(false)} className="absolute -top-12 right-0 text-white font-bold hover:text-red-500 text-xl">CLOSE [X]</button>
             <iframe 
               className="w-full h-full rounded-2xl border border-white/10" 
               src={getEmbedLink(movie.driveLink)} 

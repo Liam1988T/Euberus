@@ -1,8 +1,6 @@
 'use client';
 import { useState, ChangeEvent, FormEvent } from 'react';
-import { storage, database } from '../lib/firebase';
-import { ref as dbRef, push } from 'firebase/database';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { supabase } from '../lib/supabase'; // Ensure this points to your Supabase client
 
 export default function AddMovieForm({ onAdd }: { onAdd: () => void }) {
   const [title, setTitle] = useState('');
@@ -12,7 +10,6 @@ export default function AddMovieForm({ onAdd }: { onAdd: () => void }) {
   const [isAddingCountry, setIsAddingCountry] = useState(false);
   const [driveLink, setDriveLink] = useState('');
   
-  // New State for Description and Rating
   const [description, setDescription] = useState('');
   const [rating, setRating] = useState('');
 
@@ -26,28 +23,54 @@ export default function AddMovieForm({ onAdd }: { onAdd: () => void }) {
     e.preventDefault();
     try {
       let finalImageUrl = imageUrl;
+
+      // 1. Handle File Upload to Supabase Storage
       if (mode === 'file' && file) {
-        const sRef = storageRef(storage, `movies/${Date.now()}_${file.name}`);
-        const snapshot = await uploadBytes(sRef, file);
-        finalImageUrl = await getDownloadURL(snapshot.ref);
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('movies')
+          .upload(fileName, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage.from('movies').getPublicUrl(fileName);
+        finalImageUrl = data.publicUrl;
       }
-      // Added description and rating to the saved object
-      await push(dbRef(database, 'movies'), {
-        title, genre, country, driveLink, imageUrl: finalImageUrl, 
-        description, rating, createdAt: Date.now()
-      });
+
+      // 2. Save to Supabase Database
+      // Ensure column names match your Table Editor exactly
+      const { error } = await supabase.from('movies').insert([
+  { 
+    title, 
+    genre, 
+    country, 
+    driveLink, 
+    imageUrl: finalImageUrl, 
+    description, 
+    rating,
+    created_at: new Date().toISOString() 
+    // DO NOT include 'id' here
+  }
+]);
+      if (error) throw error;
+
       alert('Upload Success!');
+      // Reset Form
       setTitle(''); setGenre(''); setCountry(''); setDriveLink(''); setImageUrl(''); 
       setDescription(''); setRating(''); setFile(null);
-      onAdd();
-    } catch (err) { console.error(err); alert("Error saving data"); }
+      onAdd(); // This triggers the refresh in AdminPage
+    } catch (err: any) { 
+      console.error(err); 
+      alert("Error saving data: " + err.message); 
+    }
   };
 
   const inputClass = "w-full p-4 bg-gray-950/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-white transition-all placeholder-gray-500";
 
   return (
     <form onSubmit={handleSubmit} className="bg-gradient-to-br from-gray-900 to-black p-8 rounded-2xl border border-gray-800 shadow-2xl backdrop-blur-md space-y-4 w-full max-w-lg mx-auto">
-      
       <div className="flex flex-col items-center justify-center text-center mb-6">
         <h2 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-orange-500">
           EUBERUS <span className="text-white">ADMIN</span>
@@ -81,7 +104,6 @@ export default function AddMovieForm({ onAdd }: { onAdd: () => void }) {
         <button type="button" className="px-4 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-bold transition" onClick={() => setIsAddingCountry(!isAddingCountry)}>+</button>
       </div>
 
-      {/* New Metadata Inputs */}
       <textarea className={inputClass} placeholder="Movie Description" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
       <input type="number" step="0.1" className={inputClass} placeholder="Rating (0.0 - 10.0)" value={rating} onChange={(e) => setRating(e.target.value)} />
       

@@ -1,37 +1,69 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { database } from '../lib/firebase';
-import { ref, onValue, remove, update } from 'firebase/database';
+import { supabase } from '../lib/supabase'; // Ensure correct path
 
 export default function MovieList() {
   const [movies, setMovies] = useState<any[]>([]);
   const [editingMovie, setEditingMovie] = useState<any | null>(null);
   const [playingVideo, setPlayingVideo] = useState<any | null>(null);
 
+  const fetchMovies = async () => {
+    const { data, error } = await supabase
+      .from('movies')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching movies:", error);
+    } else {
+      setMovies(data || []);
+    }
+  };
+
   useEffect(() => {
-    const moviesRef = ref(database, 'movies');
-    onValue(moviesRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const movieList = Object.keys(data).map(key => ({ id: key, ...data[key] }));
-        setMovies(movieList.reverse());
-      } else {
-        setMovies([]);
-      }
-    });
+    fetchMovies();
   }, []);
 
-  const handleDelete = (id: string) => {
-    if (confirm("Delete this movie?")) remove(ref(database, `movies/${id}`));
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this movie?")) return;
+    
+    const { error } = await supabase
+      .from('movies')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert("Error deleting: " + error.message);
+    } else {
+      fetchMovies(); // Refresh list after deletion
+    }
   };
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMovie) return;
+    
     try {
-      await update(ref(database, `movies/${editingMovie.id}`), editingMovie);
+      const { error } = await supabase
+        .from('movies')
+        .update({
+          title: editingMovie.title,
+          imageUrl: editingMovie.imageUrl,
+          genre: editingMovie.genre,
+          country: editingMovie.country,
+          description: editingMovie.description,
+          rating: editingMovie.rating,
+          driveLink: editingMovie.driveLink
+        })
+        .eq('id', editingMovie.id);
+
+      if (error) throw error;
+      
       setEditingMovie(null);
-    } catch (err) { alert("Error saving changes"); }
+      fetchMovies(); // Refresh list after update
+    } catch (err: any) { 
+      alert("Error saving changes: " + err.message); 
+    }
   };
 
   const getEmbedLink = (link: string) => link?.replace(/\/view.*$/, '/preview');

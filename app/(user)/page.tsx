@@ -2,28 +2,32 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { supabase } from '../../lib/supabase'; // Import your new Supabase client
 
 export default function UserPortal() {
   const router = useRouter();
   const [movies, setMovies] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Updated useEffect to fetch via our new server-side proxy
+  // Updated useEffect to fetch directly from Supabase
   useEffect(() => {
     const fetchMovies = async () => {
-      try {
-        const response = await fetch('/api/movies');
-        if (!response.ok) throw new Error('Network response was not ok');
-        
-        const data = await response.json();
-        
-        // Convert object data to array and reverse (same as before)
-        const allMovies = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
-        setMovies(allMovies);
-      } catch (error) {
-        console.error("Error fetching movies via proxy:", error);
-      }
-    };
+  try {
+    const { data, error } = await supabase
+      .from('movies')
+      .select('*');
+    
+    // Log the error details specifically
+    if (error) {
+      console.error("Supabase Error Details:", JSON.stringify(error, null, 2));
+      throw error;
+    }
+    
+    setMovies(data || []);
+  } catch (error) {
+    console.error("Caught error:", error);
+  }
+};
 
     fetchMovies();
   }, []);
