@@ -1,22 +1,31 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { ref, onValue } from 'firebase/database';
-import { database } from '../../lib/firebase'; 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation'; // Corrected import
+import { useRouter } from 'next/navigation';
 
 export default function UserPortal() {
-  const router = useRouter(); // Initialized router
+  const router = useRouter();
   const [movies, setMovies] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Updated useEffect to fetch via our new server-side proxy
   useEffect(() => {
-    const moviesRef = ref(database, 'movies');
-    onValue(moviesRef, (snapshot) => {
-      const data = snapshot.val();
-      const allMovies = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
-      setMovies(allMovies);
-    });
+    const fetchMovies = async () => {
+      try {
+        const response = await fetch('/api/movies');
+        if (!response.ok) throw new Error('Network response was not ok');
+        
+        const data = await response.json();
+        
+        // Convert object data to array and reverse (same as before)
+        const allMovies = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
+        setMovies(allMovies);
+      } catch (error) {
+        console.error("Error fetching movies via proxy:", error);
+      }
+    };
+
+    fetchMovies();
   }, []);
 
   useEffect(() => {
@@ -44,10 +53,8 @@ export default function UserPortal() {
               exit={{ x: '-100%' }}
               transition={{ duration: 0.8, ease: "easeInOut" }}
               className="absolute inset-0 cursor-pointer"
-              // Navigates to detail page using router
               onClick={() => router.push(`/movie/${featuredMovies[currentIndex].id}`)}
             >
-              {/* Diagonal Masking Container */}
               <div 
                 className="w-full h-full"
                 style={{
@@ -62,7 +69,6 @@ export default function UserPortal() {
                 />
               </div>
 
-              {/* Title Overlay */}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent flex flex-col justify-end p-12">
                 <h1 className="text-6xl font-black mb-2 tracking-tighter">
                   {featuredMovies[currentIndex].title}
@@ -75,7 +81,6 @@ export default function UserPortal() {
           )}
         </AnimatePresence>
 
-        {/* Pagination Dots */}
         <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-2">
           {featuredMovies.map((_, index) => (
             <button
@@ -94,7 +99,6 @@ export default function UserPortal() {
           {movies.map((movie) => (
             <div 
               key={movie.id} 
-              // Navigates to detail page using router
               onClick={() => router.push(`/movie/${movie.id}`)} 
               className="group cursor-pointer"
             >
