@@ -1,3 +1,11 @@
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'EUBERUS | Premium Movie Portal',
+  description: 'The best place to stream your favorite movies.',
+};
+
+
 // app/(user)/layout.tsx
 export default function UserLayout({ children }: { children: React.ReactNode }) {
   return (
