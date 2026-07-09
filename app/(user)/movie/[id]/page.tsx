@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase'; // Updated path to your Supabase client
+import { supabase } from '@/lib/supabase';
 
 export default function MovieDetail() {
   const { id } = useParams();
@@ -41,6 +41,25 @@ export default function MovieDetail() {
     fetchMovieData();
   }, [id]);
 
+  // Combined function: Increments view count then opens the modal
+  const handleWatchNow = async () => {
+    // Ensure id is a simple string for the database call
+    const movieId = Array.isArray(id) ? id[0] : id;
+    if (!movieId) return;
+    
+    // Call the database RPC function to increment the view count
+    const { error } = await supabase.rpc('increment_movie_view', { 
+      input_movie_id: movieId 
+    });
+    
+    if (error) {
+      console.error("Error incrementing view count:", JSON.stringify(error, null, 2));
+    }
+
+    // Open the modal after the trigger
+    setIsModalOpen(true);
+  };
+
   const getEmbedLink = (link: string) => {
     if (!link) return "";
     return link.replace(/\/view.*$/, '/preview');
@@ -72,7 +91,7 @@ export default function MovieDetail() {
           </div>
 
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={handleWatchNow}
             className="w-full text-center bg-red-600 hover:bg-red-700 py-4 rounded-lg font-black text-xl transition-all shadow-[0_0_20px_rgba(220,38,38,0.3)]"
           >
             WATCH MOVIE NOW
