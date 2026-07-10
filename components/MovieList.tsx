@@ -1,8 +1,8 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase'; // Ensure correct path
+import { useEffect, useState, useMemo } from 'react';
+import { supabase } from '../lib/supabase';
 
-export default function MovieList() {
+export default function MovieList({ searchQuery = '', genreFilter = 'All Genres' }: { searchQuery?: string, genreFilter?: string }) {
   const [movies, setMovies] = useState<any[]>([]);
   const [editingMovie, setEditingMovie] = useState<any | null>(null);
   const [playingVideo, setPlayingVideo] = useState<any | null>(null);
@@ -24,6 +24,15 @@ export default function MovieList() {
     fetchMovies();
   }, []);
 
+  // NEW: Filtering logic that listens to search and filter props
+  const filteredMovies = useMemo(() => {
+    return movies.filter((movie) => {
+      const matchesSearch = movie.title?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesGenre = genreFilter === 'All Genres' || movie.genre === genreFilter;
+      return matchesSearch && matchesGenre;
+    });
+  }, [movies, searchQuery, genreFilter]);
+
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this movie?")) return;
     
@@ -35,7 +44,7 @@ export default function MovieList() {
     if (error) {
       alert("Error deleting: " + error.message);
     } else {
-      fetchMovies(); // Refresh list after deletion
+      fetchMovies();
     }
   };
 
@@ -60,7 +69,7 @@ export default function MovieList() {
       if (error) throw error;
       
       setEditingMovie(null);
-      fetchMovies(); // Refresh list after update
+      fetchMovies();
     } catch (err: any) { 
       alert("Error saving changes: " + err.message); 
     }
@@ -70,33 +79,41 @@ export default function MovieList() {
 
   return (
     <div className="p-8">
-      {/* PORTRAIT GRID */}
+      {/* PORTRAIT GRID - Mapped over filteredMovies instead of raw movies */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-        {movies.map((movie) => (
-          <div key={movie.id} className="bg-slate-900/50 border border-white/5 rounded-2xl overflow-hidden hover:border-red-500/50 transition-all duration-300 group">
-            <div className="h-[350px] overflow-hidden">
-              <img src={movie.imageUrl} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={movie.title} />
+        {filteredMovies.map((movie) => (
+          <div key={movie.id} className="bg-slate-900/50 border border-white/5 rounded-2xl overflow-hidden hover:border-red-500/50 transition-all duration-300 group flex flex-col">
+            
+            {/* Fixed Proportional Container */}
+            <div className="relative w-full aspect-[2/3] overflow-hidden">
+              <img 
+                src={movie.imageUrl} 
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                alt={movie.title} 
+              />
             </div>
             
-            <div className="p-4">
-              <h3 className="font-bold text-white mb-1 truncate">{movie.title}</h3>
+            <div className="p-4 flex flex-col flex-grow">
+             <h3 className="font-bold text-white mb-1 leading-tight break-words">{movie.title}</h3>
               <p className="text-gray-400 text-xs mb-1">{movie.genre} • {movie.country}</p>
               <p className="text-yellow-500 text-xs mb-4 font-bold">Rating: {movie.rating || 'N/A'}/10</p>
               
-              <button onClick={() => setPlayingVideo(movie)} className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-bold transition mb-2">
-                WATCH MOVIE
-              </button>
+              <div className="mt-auto">
+                <button onClick={() => setPlayingVideo(movie)} className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-bold transition mb-2">
+                  WATCH MOVIE
+                </button>
 
-              <div className="flex gap-2">
-                <button onClick={() => setEditingMovie(movie)} className="flex-1 bg-white/5 hover:bg-yellow-600 py-1.5 rounded text-xs font-bold transition">Edit</button>
-                <button onClick={() => handleDelete(movie.id)} className="flex-1 bg-white/5 hover:bg-red-900 py-1.5 rounded text-xs font-bold transition">Remove</button>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditingMovie(movie)} className="flex-1 bg-white/5 hover:bg-yellow-600 py-1.5 rounded text-xs font-bold transition">Edit</button>
+                  <button onClick={() => handleDelete(movie.id)} className="flex-1 bg-white/5 hover:bg-red-900 py-1.5 rounded text-xs font-bold transition">Remove</button>
+                </div>
               </div>
             </div>
           </div>
         ))}
       </div>
 
-      {/* Video Modal */}
+      {/* Modals remain unchanged */}
       {playingVideo && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
           <div className="w-full max-w-4xl aspect-video relative">
@@ -106,7 +123,6 @@ export default function MovieList() {
         </div>
       )}
 
-      {/* Edit Modal */}
       {editingMovie && (
         <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <form onSubmit={handleUpdate} className="bg-gray-900 p-8 rounded-2xl border border-gray-700 w-full max-w-sm space-y-4 my-auto">

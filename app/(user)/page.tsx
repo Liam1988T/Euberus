@@ -1,34 +1,32 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../../lib/supabase'; // Import your new Supabase client
+import { supabase } from '../../lib/supabase';
 
 export default function UserPortal() {
   const router = useRouter();
   const [movies, setMovies] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
+  
+  // Search and Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [genreFilter, setGenreFilter] = useState('All Genres');
 
-  // Updated useEffect to fetch directly from Supabase
   useEffect(() => {
     const fetchMovies = async () => {
-  try {
-    const { data, error } = await supabase
-      .from('movies')
-      .select('*');
-    
-    // Log the error details specifically
-    if (error) {
-      console.error("Supabase Error Details:", JSON.stringify(error, null, 2));
-      throw error;
-    }
-    
-    setMovies(data || []);
-  } catch (error) {
-    console.error("Caught error:", error);
-  }
-};
-
+      try {
+        const { data, error } = await supabase
+          .from('movies')
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        setMovies(data || []);
+      } catch (error) {
+        console.error("Error fetching movies:", error);
+      }
+    };
     fetchMovies();
   }, []);
 
@@ -42,6 +40,16 @@ export default function UserPortal() {
     return () => clearInterval(interval);
   }, [movies]);
 
+  // Filtering Logic
+  const filteredMovies = useMemo(() => {
+    return movies.filter((movie) => {
+      const matchesSearch = movie.title?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesGenre = genreFilter === 'All Genres' || movie.genre === genreFilter;
+      return matchesSearch && matchesGenre;
+    });
+  }, [movies, searchQuery, genreFilter]);
+
+  const genres = ['All Genres', ...Array.from(new Set(movies.map((m) => m.genre).filter(Boolean)))];
   const featuredMovies = movies.slice(0, 5);
 
   return (
@@ -84,36 +92,61 @@ export default function UserPortal() {
             </motion.div>
           )}
         </AnimatePresence>
+      </section>
 
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 flex gap-2">
-          {featuredMovies.map((_, index) => (
-            <button
-              key={index}
-              className={`h-2 w-2 rounded-full transition-all ${index === currentIndex ? 'bg-red-600 w-8' : 'bg-white/50'}`}
-              onClick={() => setCurrentIndex(index)}
-            />
-          ))}
+      {/* Search and Filter Section */}
+      <section className="sticky top-[80px] z-40 bg-black/80 backdrop-blur-md border-b border-white/10 px-8 py-4">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-4">
+          <input 
+            type="text" 
+            placeholder="Search movies..." 
+            className="flex-1 bg-gray-900 border border-gray-700 px-4 py-2 rounded-lg text-white outline-none focus:border-red-600"
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          <select 
+            className="bg-gray-900 border border-gray-700 px-4 py-2 rounded-lg text-white outline-none focus:border-red-600"
+            onChange={(e) => setGenreFilter(e.target.value)}
+          >
+            {genres.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
         </div>
       </section>
 
-      {/* Movie Grid Section */}
-      <section className="p-8">
-        <h3 className="text-2xl font-bold mb-6 border-l-4 border-red-600 pl-4">All Movies</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {movies.map((movie) => (
+      {/* Movie Catalog Grid */}
+      <section className="py-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+          {filteredMovies.map((movie) => (
             <div 
               key={movie.id} 
-              onClick={() => router.push(`/movie/${movie.id}`)} 
-              className="group cursor-pointer"
+              className="bg-slate-900/50 border border-white/5 rounded-2xl overflow-hidden hover:border-red-500/50 transition-all duration-300 group flex flex-col"
             >
-              <div className="aspect-[2/3] bg-gray-900 rounded-lg overflow-hidden mb-3 border border-gray-800">
+              <div 
+                className="relative w-full aspect-[2/3] overflow-hidden cursor-pointer"
+                onClick={() => router.push(`/movie/${movie.id}`)}
+              >
                 <img 
                   src={movie.imageUrl} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
-                  alt={movie.title}
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                  alt={movie.title} 
                 />
               </div>
-              <h4 className="font-bold truncate text-sm px-1">{movie.title}</h4>
+              
+              <div className="p-4 flex flex-col flex-grow">
+                <h4 className="font-bold text-white mb-1 leading-tight break-words text-sm">
+                  {movie.title}
+                </h4>
+                <p className="text-gray-400 text-xs mb-1">{movie.genre}</p>
+                <p className="text-yellow-500 text-xs font-bold mb-4">
+                  Rating: {movie.rating || 'N/A'}/10
+                </p>
+                
+                <button 
+                  onClick={() => router.push(`/movie/${movie.id}`)}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-bold transition mt-auto"
+                >
+                  WATCH NOW
+                </button>
+              </div>
             </div>
           ))}
         </div>

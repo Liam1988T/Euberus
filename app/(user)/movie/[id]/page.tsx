@@ -43,7 +43,6 @@ export default function MovieDetail() {
 
   // Combined function: Increments view count then opens the modal
   const handleWatchNow = async () => {
-    // Ensure id is a simple string for the database call
     const movieId = Array.isArray(id) ? id[0] : id;
     if (!movieId) return;
     
@@ -73,7 +72,25 @@ export default function MovieDetail() {
         <img src={movie.imageUrl} className="w-full aspect-[2/3] object-cover rounded-2xl shadow-2xl border border-gray-800" alt={movie.title} />
         
         <div className="space-y-6">
-          <h1 className="text-5xl font-black tracking-tighter">{movie.title}</h1>
+          {/* Header Section: Title and Premium Back Button */}
+          <div className="flex justify-between items-start gap-4">
+            <h1 className="text-5xl font-black tracking-tighter leading-none">{movie.title}</h1>
+            <button 
+              onClick={() => router.back()} 
+              className="group flex items-center justify-center w-12 h-12 bg-white/5 hover:bg-red-600 border border-white/10 hover:border-red-500 rounded-full transition-all duration-300 backdrop-blur-sm"
+              aria-label="Go back"
+            >
+              <svg 
+                className="w-6 h-6 text-white group-hover:scale-110 transition-transform duration-300" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+          </div>
+
           <div className="flex gap-4 text-red-500 font-bold">
             <span>{movie.genre}</span>
             {movie.country && <span>{movie.country}</span>}
